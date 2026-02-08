@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { redis } from '@/lib/redis';
-import { authOptions } from '../../auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth'; // ← 변경
 import { ShareLink } from '@/types';
 
 export async function GET(request: NextRequest) {
