@@ -42,7 +42,7 @@ export async function getFileMetadata(fileId: string, accessToken: string) {
   }
 }
 
-export async function getFileViewLink(fileId: string): string {
-  // Google Drive 뷰어 링크 생성
+// Option 1: async 제거 (권장)
+  export function getFileViewLink(fileId: string): string {
   return `https://drive.google.com/file/d/${fileId}/preview`;
 }
