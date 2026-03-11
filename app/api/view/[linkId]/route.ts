@@ -11,11 +11,13 @@ export async function GET(
     const { linkId } = params;
     
     // 링크 정보 가져오기
-    const link = await redis.get<ShareLink>(`link:${linkId}`);
-    
-    if (!link) {
+    const rawLink = await redis.get(`link:${linkId}`);
+
+    if (!rawLink) {
       return NextResponse.json({ error: 'Link not found' }, { status: 404 });
     }
+
+    const link: ShareLink = typeof rawLink === 'string' ? JSON.parse(rawLink) : rawLink as ShareLink;
     
     // Google Drive 뷰어 링크 생성
     const fileUrl = `https://drive.google.com/file/d/${link.fileId}/preview`;
