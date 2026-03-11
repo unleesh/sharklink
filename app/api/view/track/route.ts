@@ -1,7 +1,13 @@
 // app/api/view/track/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { nanoid } from 'nanoid';
+import { randomBytes } from 'crypto';
 import UAParser from 'ua-parser-js';
+
+function generateId(length = 16): string {
+  return randomBytes(Math.ceil(length * 3 / 4))
+    .toString('base64url')
+    .slice(0, length);
+}
 import { redis } from '@/lib/redis';
 import { getLocationFromIP } from '@/lib/geolocation';
 import { ViewLog } from '@/types';
@@ -34,7 +40,7 @@ export async function POST(request: NextRequest) {
     const browser = result.browser.name || 'Unknown';
     
     // 고유 뷰 ID 생성
-    const viewId = nanoid(16);
+    const viewId = generateId(16);
     
     const viewLog: ViewLog = {
       linkId,
@@ -49,8 +55,8 @@ export async function POST(request: NextRequest) {
       referrer: referrer || undefined,
     };
     
-    // Redis에 저장
-    await redis.set(`view:${viewId}`, viewLog);
+    // Redis에 저장 (명시적 JSON 직렬화)
+    await redis.set(`view:${viewId}`, JSON.stringify(viewLog));
     
     // 링크별 뷰 목록에 추가
     await redis.lpush(`link:${linkId}:views`, viewId);

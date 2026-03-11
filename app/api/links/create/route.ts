@@ -1,10 +1,16 @@
 // app/api/links/create/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { nanoid } from 'nanoid';
+import { randomBytes } from 'crypto';
 import { redis } from '@/lib/redis';
 import { authOptions } from '@/lib/auth'; // ← 변경
 import { ShareLink } from '@/types';
+
+function generateId(length = 10): string {
+  return randomBytes(Math.ceil(length * 3 / 4))
+    .toString('base64url')
+    .slice(0, length);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
     
     // 고유 링크 ID 생성 (10자)
-    const linkId = nanoid(10);
+    const linkId = generateId(10);
     
     const shareLink: ShareLink = {
       linkId,

@@ -19,24 +19,27 @@ export async function GET(
     const { linkId } = params;
     
     // 링크 정보 가져오기
-    const link = await redis.get<ShareLink>(`link:${linkId}`);
-    
-    if (!link) {
+    const rawLink = await redis.get(`link:${linkId}`);
+
+    if (!rawLink) {
       return NextResponse.json({ error: 'Link not found' }, { status: 404 });
     }
-    
+
+    const link: ShareLink = typeof rawLink === 'string' ? JSON.parse(rawLink) : rawLink as ShareLink;
+
     // 링크 소유자 확인
     if (link.ownerId !== session.user.email) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
-    
+
     // 뷰 로그 가져오기
     const viewIds = await redis.lrange(`link:${linkId}:views`, 0, -1);
-    
+
     const views: ViewLog[] = [];
     for (const viewId of viewIds) {
-      const viewLog = await redis.get<ViewLog>(`view:${viewId}`);
-      if (viewLog) {
+      const rawView = await redis.get(`view:${viewId}`);
+      if (rawView) {
+        const viewLog: ViewLog = typeof rawView === 'string' ? JSON.parse(rawView) : rawView as ViewLog;
         views.push(viewLog);
       }
     }
