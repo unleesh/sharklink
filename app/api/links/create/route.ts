@@ -35,9 +35,9 @@ export async function POST(request: NextRequest) {
       viewCount: 0,
     };
     
-    // Redis에 저장
-    await redis.set(`link:${linkId}`, shareLink);
-    
+    // Redis에 저장 (명시적 JSON 직렬화)
+    await redis.set(`link:${linkId}`, JSON.stringify(shareLink));
+
     // 사용자별 링크 목록에 추가
     await redis.lpush(`user:${session.user.email}:links`, linkId);
     
