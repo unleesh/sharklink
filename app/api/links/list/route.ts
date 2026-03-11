@@ -24,13 +24,13 @@ export async function GET(request: NextRequest) {
     const links: ShareLink[] = [];
     
     for (const linkId of linkIds) {
-      const link = await redis.get<ShareLink>(`link:${linkId}`);
-      if (link) {
-        // 뷰 카운트 업데이트
-        const viewCount = await redis.llen(`link:${linkId}:views`) || 0;
-        link.viewCount = viewCount as number;
-        links.push(link);
-      }
+      const raw = await redis.get(`link:${linkId}`);
+      if (!raw) continue;
+      const link: ShareLink = typeof raw === 'string' ? JSON.parse(raw) : raw as ShareLink;
+      // 뷰 카운트 업데이트
+      const viewCount = await redis.llen(`link:${linkId}:views`) || 0;
+      link.viewCount = viewCount as number;
+      links.push(link);
     }
     
     // 최신순 정렬
