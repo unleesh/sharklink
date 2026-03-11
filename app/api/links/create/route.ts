@@ -58,6 +58,9 @@ export async function POST(request: NextRequest) {
     
   } catch (error: any) {
     console.error('Create link error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({
+      error: error.message,
+      type: error.constructor?.name,
+    }, { status: 500 });
   }
 }
