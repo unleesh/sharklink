@@ -3,7 +3,7 @@
 
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ShareLink, DriveFile } from '@/types';
 
 export default function Dashboard() {
@@ -215,26 +215,51 @@ function LinkCard({ link }: { link: ShareLink }) {
 }
 
 function CreateLinkModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const { data: session } = useSession();
   const [files, setFiles] = useState<DriveFile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [creating, setCreating] = useState(false);
   const [selectedFile, setSelectedFile] = useState<DriveFile | null>(null);
+  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    fetchFiles();
+    fetchFiles('', null, true);
   }, []);
 
-  const fetchFiles = async () => {
+  const fetchFiles = async (searchQuery: string, pageToken: string | null, replace: boolean) => {
+    if (replace) setLoading(true);
+    else setLoadingMore(true);
     try {
-      const response = await fetch('/api/drive/files');
+      const params = new URLSearchParams();
+      if (searchQuery) params.set('search', searchQuery);
+      if (pageToken) params.set('pageToken', pageToken);
+      const response = await fetch(`/api/drive/files?${params.toString()}`);
       const data = await response.json();
-      setFiles(data.files || []);
+      const newFiles: DriveFile[] = data.files || [];
+      setFiles(replace ? newFiles : (prev) => [...prev, ...newFiles]);
+      setNextPageToken(data.nextPageToken ?? null);
     } catch (error) {
       console.error('Failed to fetch files:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const handleSearchInputChange = (value: string) => {
+    setSearchInput(value);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    searchTimeout.current = setTimeout(() => {
+      setSearch(value);
+      fetchFiles(value, null, true);
+    }, 400);
+  };
+
+  const handleLoadMore = () => {
+    if (nextPageToken) fetchFiles(search, nextPageToken, false);
   };
 
   const handleCreate = async () => {
@@ -268,9 +293,9 @@ function CreateLinkModal({ onClose, onSuccess }: { onClose: () => void; onSucces
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-6 border-b flex items-center justify-between">
+        <div className="p-6 border-b flex items-center justify-between shrink-0">
           <h2 className="text-2xl font-bold text-gray-900">새 링크 만들기</h2>
           <button
             onClick={onClose}
@@ -280,12 +305,19 @@ function CreateLinkModal({ onClose, onSuccess }: { onClose: () => void; onSucces
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[60vh]">
-          <p className="text-gray-600 mb-4">
-            Google Drive에서 파일을 선택하세요
-          </p>
+        {/* Search */}
+        <div className="px-6 pt-4 shrink-0">
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => handleSearchInputChange(e.target.value)}
+            placeholder="파일 이름으로 검색..."
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+          />
+        </div>
 
+        {/* Content */}
+        <div className="p-6 overflow-y-auto flex-1">
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -293,7 +325,9 @@ function CreateLinkModal({ onClose, onSuccess }: { onClose: () => void; onSucces
           ) : files.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-4xl mb-3">📁</div>
-              <p className="text-gray-600">Google Drive에 파일이 없습니다</p>
+              <p className="text-gray-600">
+                {search ? '검색 결과가 없습니다' : 'Google Drive에 파일이 없습니다'}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3">
@@ -311,22 +345,31 @@ function CreateLinkModal({ onClose, onSuccess }: { onClose: () => void; onSucces
                     {file.iconLink && (
                       <img src={file.iconLink} alt="" className="w-6 h-6" />
                     )}
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{file.name}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900 truncate">{file.name}</div>
                       <div className="text-sm text-gray-500">{file.mimeType}</div>
                     </div>
                     {selectedFile?.id === file.id && (
-                      <div className="text-blue-600 text-xl">✓</div>
+                      <div className="text-blue-600 text-xl shrink-0">✓</div>
                     )}
                   </div>
                 </button>
               ))}
+              {nextPageToken && (
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="w-full py-3 text-sm text-blue-600 hover:bg-blue-50 border border-blue-200 rounded-lg transition disabled:opacity-50"
+                >
+                  {loadingMore ? '불러오는 중...' : '더 불러오기'}
+                </button>
+              )}
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t flex justify-end gap-3">
+        <div className="p-6 border-t flex justify-end gap-3 shrink-0">
           <button
             onClick={onClose}
             className="px-6 py-3 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition"
